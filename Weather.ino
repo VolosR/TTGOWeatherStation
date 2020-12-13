@@ -4,7 +4,7 @@
 #include <SPI.h>
 #include <TFT_eSPI.h> // Hardware-specific library
 #include <ArduinoJson.h>          //https://github.com/bblanchon/ArduinoJson.git
-#include <NTPClient.h>           //https://github.com/arduino-libraries/NTPClient.git
+#include <NTPClient.h>           //https://github.com/taranais/NTPClient
 
 TFT_eSPI tft = TFT_eSPI();       // Invoke custom library
 
