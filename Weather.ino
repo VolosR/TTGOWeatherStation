@@ -16,6 +16,7 @@ TFT_eSPI tft = TFT_eSPI();  // Invoke custom library
 #include <HTTPClient.h>
 #include <WiFi.h>
 #include <WiFiUdp.h>
+#include "battery.hpp"
 
 #include "Orbitron_Medium_20.h"
 
@@ -23,6 +24,7 @@ const int pwmFreq = 5000;
 const int pwmResolution = 8;
 const int pwmLedChannelTFT = 0;
 
+#define WIFI_RETRY_CONNECTION 10  // 30 seconds wait for wifi connection
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASS;
 String town = "Berlin";  // EDIT
@@ -49,7 +51,13 @@ String timeStamp;
 int backlight[5] = {10, 30, 60, 120, 220};
 byte b = 1;
 
+uint32_t suspendCount = 0;
+
+float volt = 0.0;
+
 void setup(void) {
+    Serial.begin(115200);
+    delay(200);
     pinMode(0, INPUT_PULLUP);
     pinMode(35, INPUT);
     tft.init();
@@ -62,16 +70,22 @@ void setup(void) {
     ledcAttachPin(TFT_BL, pwmLedChannelTFT);
     ledcWrite(pwmLedChannelTFT, backlight[b]);
 
-    Serial.begin(115200);
     tft.print("Connecting to ");
     tft.println(ssid);
     WiFi.begin(ssid, password);
 
-    while (WiFi.status() != WL_CONNECTED) {
-        delay(300);
+    int wifi_retry = 0;
+    while (!WiFi.isConnected() && wifi_retry++ < WIFI_RETRY_CONNECTION) {
+        Serial.print(".");
         tft.print(".");
+        delay(300);  // increment this delay on possible reconnect issues
+    }
+    if (!WiFi.isConnected()) {
+        ESP.restart();
     }
 
+    delay(100);
+    Serial.println();
     tft.println("");
     tft.println("WiFi connected.");
     tft.println("IP address: ");
@@ -115,7 +129,25 @@ void setup(void) {
     // GMT 0 = 0
     timeClient.setTimeOffset(3600); /*EDDITTTTTTTTTTTTTTTTTTTTTTTT                      */
     getData();
+    setupBattery();              // init battery ADC.
+    setupBattADC();
     delay(500);
+}
+
+void suspend() {
+    suspendCount = 0;
+    delay(2000);
+    int r = digitalRead(TFT_BL);
+    digitalWrite(TFT_BL, !r);
+    delay(2000);
+    tft.writecommand(TFT_DISPOFF);
+    tft.writecommand(TFT_SLPIN);
+    //After using light sleep, you need to disable timer wake, because here use external IO port to wake up
+    esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_TIMER);
+    // esp_sleep_enable_ext1_wakeup(GPIO_SEL_35, ESP_EXT1_WAKEUP_ALL_LOW);
+    esp_sleep_enable_ext0_wakeup(GPIO_NUM_35, 0);
+    delay(200);
+    esp_deep_sleep_start();
 }
 
 int i = 0;
@@ -129,6 +161,7 @@ int frame = 0;
 String curSeconds = "";
 
 void loop() {
+    if (suspendCount++ > 2000 && !battIsCharging()) suspend();
     tft.pushImage(0, 88, 135, 65, ani[frame]);
     frame++;
     if (frame >= 10)
@@ -159,11 +192,14 @@ void loop() {
     } else
         press1 = 0;
 
-    if (count == 0)
+    if (count++ > 4000){
         getData();
-    count++;
-    if (count > 2000)
         count = 0;
+    }
+    if (count % 400 == 0) {
+      volt = battGetVoltage();
+      Serial.println("[BATT] volt:"+String(volt)+" "+String(battCalcPercentage(volt))+"%");
+    }
 
     tft.setFreeFont(&Orbitron_Medium_20);
     tft.setCursor(2, 187);
@@ -223,15 +259,13 @@ void getData() {
         int httpCode = http.GET();   //Make the request
 
         if (httpCode > 0) {  //Check for the returning code
-
             payload = http.getString();
             // Serial.println(httpCode);
-            Serial.println(payload);
-
+            // Serial.println(payload);
+            Serial.println("[API] httpCode: "+String(httpCode));
         }
-
         else {
-            Serial.println("Error on HTTP request");
+            Serial.println("[API] Error! httpCode: "+String(httpCode));
         }
 
         http.end();  //Free the resources
@@ -248,7 +282,7 @@ void getData() {
     hum = hum2;
     tmp = ftmp2;
 
-    Serial.println("Temperature" + String(tmp));
-    Serial.println("Humidity" + hum);
-    Serial.println(town);
+    Serial.println("[DATA] Temperature: " + String(tmp));
+    Serial.println("[DATA] Humidity: " + hum);
+    Serial.println("[DATA] "+town);
 }
