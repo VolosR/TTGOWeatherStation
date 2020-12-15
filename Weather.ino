@@ -24,7 +24,7 @@ const int pwmFreq = 5000;
 const int pwmResolution = 8;
 const int pwmLedChannelTFT = 0;
 
-#define WIFI_RETRY_CONNECTION 10  // 30 seconds wait for wifi connection
+#define WIFI_RETRY_CONNECTION 5  // 30 seconds wait for wifi connection
 const char* ssid = WIFI_SSID;
 const char* password = WIFI_PASS;
 String town = "Berlin";  // EDIT
@@ -90,7 +90,7 @@ void setup(void) {
     tft.println("WiFi connected.");
     tft.println("IP address: ");
     tft.println(WiFi.localIP());
-    delay(3000);
+    delay(500);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextSize(1);
     tft.fillScreen(TFT_BLACK);
@@ -131,15 +131,15 @@ void setup(void) {
     getData();
     setupBattery();              // init battery ADC.
     setupBattADC();
-    delay(500);
+    delay(100);
 }
 
 void suspend() {
     suspendCount = 0;
-    delay(2000);
+    delay(500);
     int r = digitalRead(TFT_BL);
     digitalWrite(TFT_BL, !r);
-    delay(2000);
+    delay(500);
     tft.writecommand(TFT_DISPOFF);
     tft.writecommand(TFT_SLPIN);
     //After using light sleep, you need to disable timer wake, because here use external IO port to wake up
@@ -161,7 +161,7 @@ int frame = 0;
 String curSeconds = "";
 
 void loop() {
-    if (suspendCount++ > 2000 && !battIsCharging()) suspend();
+    if (suspendCount++ > 1000 && !battIsCharging()) suspend();
     tft.pushImage(0, 88, 135, 65, ani[frame]);
     frame++;
     if (frame >= 10)
