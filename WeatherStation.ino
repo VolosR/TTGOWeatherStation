@@ -2,64 +2,59 @@
 #include <SPI.h>
 #include <TFT_eSPI.h>
 #include <ArduinoJson.h>
-#include <NTPClient.h>
-
-TFT_eSPI tft = TFT_eSPI();
-
-#define TFT_GREY 0x5AEB
-#define lightblue 0x01E9
-#define darkred 0xA041
-#define blue 0x5D9B
+#include <time.h>
 #include "Orbitron_Medium_20.h"
 #include <WiFi.h>
-
-#include <WiFiUdp.h>
 #include <HTTPClient.h>
+
+#define TFT_GREY 0x5AEB
+#define TFT_LIGHTBLUE 0x01E9
+#define TFT_DARKRED 0xA041
+#define TFT_BLUE 0x5D9B
+
+TFT_eSPI tft = TFT_eSPI();
+StaticJsonDocument<1000> doc;
 
 const int pwmFreq = 5000;
 const int pwmResolution = 8;
 const int pwmLedChannelTFT = 0;
 
+const char* ntpServer = "pool.ntp.org";
+const long gmtOffset_sec = 3600;
+const int daylightOffset_sec = 3600;
 
 const char* ssid = "ssid"; // EDIT
 const char* password = "password"; // EDIT
-String town = "Oslo";
-String Country = "NO";
-const String endpoint = "http://api.openweathermap.org/data/2.5/weather?q="+town+","+Country+"&units=metric&APPID=";
+const String town = "Oslo";
+const String country = "NO";
+const String endpoint = "http://api.openweathermap.org/data/2.5/weather?q="+town+","+country+"&units=metric&APPID=";
 const String key = "apiKey"; // EDIT
 
-String payload = ""; //whole json 
-String tmp = ""; //temperatur
-String hum = ""; //humidity
-  
+String payload = "";  // whole json 
+String tmp = "";      // temperatur
+String hum = "";      // humidity
 
-StaticJsonDocument<1000> doc;
-
-// Define NTP Client to get time
-WiFiUDP ntpUDP;
-NTPClient timeClient(ntpUDP);
-
-// Variables to save date and time
-String formattedDate;
-String dayStamp;
-String timeStamp;
-
-int backlight[5] = {10,30,60,120,220};
-byte b=1;
+int backlight[5] = {10,30,60,120,220};  // Brightness options
+byte b=1;                               // Brighthess level
 
 void setup(void) {
   pinMode(0,INPUT_PULLUP);
   pinMode(35,INPUT);
+
+  // Initialize screen
   tft.init();
   tft.setRotation(0);
   tft.fillScreen(TFT_BLACK);
-  tft.setTextColor(TFT_WHITE,TFT_BLACK);  tft.setTextSize(1);
+  tft.setTextColor(TFT_WHITE,TFT_BLACK);
+  tft.setTextSize(1);
 
   ledcSetup(pwmLedChannelTFT, pwmFreq, pwmResolution);
   ledcAttachPin(TFT_BL, pwmLedChannelTFT);
   ledcWrite(pwmLedChannelTFT, backlight[b]);
 
   Serial.begin(115200);
+
+  // Initialize WiFi
   tft.print("Connecting to ");
   tft.println(ssid);
   WiFi.begin(ssid, password);
@@ -74,153 +69,159 @@ void setup(void) {
   tft.println("IP address: ");
   tft.println(WiFi.localIP());
   delay(3000);
-  tft.setTextColor(TFT_WHITE,TFT_BLACK);  tft.setTextSize(1);
+
+  configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+
+  // Screen setup
+  tft.setTextColor(TFT_WHITE,TFT_BLACK);
+  tft.setTextSize(1);
   tft.fillScreen(TFT_BLACK);
   tft.setSwapBytes(true);
-   
+
+  // IP address
   tft.setCursor(2, 232, 1);
   tft.println(WiFi.localIP());
+
+  // Bright label
   tft.setCursor(80, 204, 1);
   tft.println("BRIGHT:");
-    
+
+  // Seconds label
   tft.setCursor(80, 152, 2);
   tft.println("SEC:");
-  tft.setTextColor(TFT_WHITE,lightblue);
+
+  // Temperature label
+  tft.setTextColor(TFT_WHITE,TFT_LIGHTBLUE);
   tft.setCursor(4, 152, 2);
   tft.println("TEMP:");
-  
+
+  // Humidity label
   tft.setCursor(4, 192, 2);
   tft.println("HUM: ");
+
+  // Town
   tft.setTextColor(TFT_WHITE,TFT_BLACK);
-  
   tft.setFreeFont(&Orbitron_Medium_20);
   tft.setCursor(6, 82);
   tft.println(town);
-  
-  tft.fillRect(68,152,1,74,TFT_GREY);
-  
-  for(int i=0;i<b+1;i++)
-  tft.fillRect(78+(i*7),216,3,10,blue);
 
-  // Initialize a NTPClient to get time
-  timeClient.begin(); 
-  // Set offset time in seconds to adjust for your timezone, for example:
-  // GMT +1 = 3600
-  // GMT +8 = 28800
-  // GMT -1 = -3600
-  // GMT 0 = 0
-  timeClient.setTimeOffset(7200);
-  getData();
-  delay(500);
+  // Vertical line
+  tft.fillRect(68,152,1,74,TFT_GREY);
+
+  // Brightness status
+  for(int i=0;i<b+1;i++) {
+    tft.fillRect(78+(i*7),216,3,10,TFT_BLUE);
+  }
 }
 
-int i = 0;
-String tt = "";
-int count = 0;
-bool inv = 1;
-int press1 = 0; 
-int press2 = 0;
-int frame = 0;
-String curSeconds = "";
+int counter = 0;        // Count time after last data update
+int period = 2000;      // Period for data request
+int btnLeft = 0;        // Invert display colors
+int btnRight = 0;       // Brightness controll
+int frame = 0;          // Frame for animation
+bool inverted = 1;      // Display invert state
 
 void loop() {
+  // Animation
   tft.pushImage(0, 88,  135, 65, ani[frame]);
   frame++;
-  if(frame>=10)
+  if(frame>=10) {
     frame=0;
-    
+  }
+
+  // Brightness control
   if(digitalRead(35)==0) {
-    if(press2==0) {
-      press2=1;
+    if(btnRight==0) {
+      btnRight=1;
       tft.fillRect(78,216,44,12,TFT_BLACK);
-  
       b++;
-      if(b>=5)
-      b=0;
+      
+      if(b>=5) {
+        b=0;
+      }
   
-      for(int i=0;i<b+1;i++)
-      tft.fillRect(78+(i*7),216,3,10,blue);
-      ledcWrite(pwmLedChannelTFT, backlight[b]);
+      for(int i=0;i<b+1;i++) {
+        tft.fillRect(78+(i*7),216,3,10,TFT_BLUE);
+        ledcWrite(pwmLedChannelTFT, backlight[b]);
+      }
     }
-  } else press2=0;
-  
+  } else {
+    btnRight=0;
+  }
+
+  // Invert screen color
   if(digitalRead(0)==0) {
-    if(press1==0) {
-      press1=1;
-      inv=!inv;
-      tft.invertDisplay(inv);
+    if(btnLeft==0) {
+      btnLeft=1;
+      inverted=!inverted;
+      tft.invertDisplay(inverted);
     }
-  } else press1=0;
-  
-  if(count==0)
+  } else {
+    btnLeft=0;
+  }
+
+  // Data request every period
+  if(counter==0) {
     getData();
-    count++;
+    counter++;
+  }
     
-  if(count>2000)
-    count=0;
-   
+  if(counter>period) {
+    counter=0;
+  }
+
+  // Temperature value
   tft.setFreeFont(&Orbitron_Medium_20);
   tft.setCursor(2, 187);
   tft.println(tmp.substring(0,2));
-  
+
+  // Humidity value
   tft.setCursor(2, 227);
   tft.println(hum+"%");
+
+  // Get date and time
+  struct tm timeinfo;
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return;
+  }
   
+  // Display date
   tft.setTextColor(TFT_ORANGE,TFT_BLACK);
   tft.setTextFont(2);
   tft.setCursor(6, 44);
-  tft.println(dayStamp);
+  tft.println(&timeinfo, "%B %d %Y");
+
+  Serial.println(&timeinfo);
+
+  // Display seconds
   tft.setTextColor(TFT_WHITE,TFT_BLACK);
-  
-  while(!timeClient.update()) {
-    timeClient.forceUpdate();
-  }
-  
-  // The formattedDate comes with the following format:
-  // 2018-05-28T16:00:13Z
-  // We need to extract date and time
-  formattedDate = timeClient.getFormattedTime();
-  Serial.println(formattedDate);
+  tft.fillRect(78,170,48,28,TFT_DARKRED);
+  tft.setFreeFont(&Orbitron_Light_24);
+  tft.setCursor(81, 192);
+  tft.println(&timeinfo, "%S");
 
-  int splitT = formattedDate.indexOf("T");
-  dayStamp = formattedDate.substring(0, splitT);
- 
-  timeStamp = formattedDate.substring(splitT+1, formattedDate.length());
-
-  if(curSeconds!=timeStamp.substring(6,8)) {
-   tft.fillRect(78,170,48,28,darkred);
-   tft.setFreeFont(&Orbitron_Light_24);
-   tft.setCursor(81, 192);
-   tft.println(timeStamp.substring(6,8));
-   curSeconds=timeStamp.substring(6,8);
-  }
-  
+  // Display time
   tft.setFreeFont(&Orbitron_Light_32);
-  String current=timeStamp.substring(0,5);
-  if(current!=tt) {
-    tft.fillRect(3,8,120,30,TFT_BLACK);
-    tft.setCursor(5, 34);
-    tft.println(timeStamp.substring(0,5));
-    tt=timeStamp.substring(0,5);
-  }
+  tft.fillRect(3,8,120,30,TFT_BLACK);
+  tft.setCursor(5, 34);
+  tft.println(&timeinfo, "%H %M");
   
   delay(80);
 }
 
-
 void getData() {
   tft.fillRect(1,170,64,20,TFT_BLACK);
   tft.fillRect(1,210,64,20,TFT_BLACK);
-  if ((WiFi.status() == WL_CONNECTED)) { //Check the current connection status
+  if (WiFi.status() == WL_CONNECTED) { //Check the current connection status
  
     HTTPClient http;
  
     http.begin(endpoint + key); //Specify the URL
     int httpCode = http.GET();  //Make the request
  
-    if (httpCode > 0) { //Check for the returning code
+    if (httpCode > 0) {
       payload = http.getString();
-      // Serial.println(httpCode);
       Serial.println(payload);
     } else {
       Serial.println("Error on HTTP request");
@@ -234,12 +235,6 @@ void getData() {
   
   String tmp2 = doc["main"]["temp"];
   String hum2 = doc["main"]["humidity"];
-  String town2 = doc["name"];
   tmp=tmp2;
   hum=hum2;
-  
- Serial.println("Temperature"+String(tmp));
- Serial.println("Humidity"+hum);
- Serial.println(town);
-   
  }
