@@ -15,27 +15,50 @@
 TFT_eSPI tft = TFT_eSPI();
 StaticJsonDocument<1000> doc;
 
+// Display settings
 const int pwmFreq = 5000;
 const int pwmResolution = 8;
 const int pwmLedChannelTFT = 0;
 
+// Time settings
 const char* ntpServer = "pool.ntp.org";
-const long gmtOffset_sec = 3600;
+const int gmtOffset_sec = 3600;
 const int daylightOffset_sec = 3600;
+struct tm timeinfo;
+// Store date objects
+char dateFormat[80];
+char secondFormat[80];
+char timeFormat[80];
 
+// Wifi
 const char* ssid = "ssid"; // EDIT
 const char* password = "password"; // EDIT
+
+// Open Weather API
 const String town = "Oslo";
 const String country = "NO";
 const String endpoint = "http://api.openweathermap.org/data/2.5/weather?q="+town+","+country+"&units=metric&APPID=";
 const String key = "apiKey"; // EDIT
 
+// Data
 String payload = "";  // whole json 
-String tmp = "";      // temperatur
+String tmp = "";      // temperature
 String hum = "";      // humidity
 
 int backlight[5] = {10,30,60,120,220};  // Brightness options
 byte b=1;                               // Brighthess level
+
+void printLocalTime() {
+  if(!getLocalTime(&timeinfo)){
+    Serial.println("Failed to obtain time");
+    return;
+  }
+  strftime(dateFormat,80,"%d %B %Y", &timeinfo);
+  strftime(timeFormat,80,"%H:%M", &timeinfo);
+  strftime(secondFormat,80,"%S", &timeinfo);
+  
+  Serial.println(&timeinfo, "%A, %d %B %Y %H:%M:%S");
+}
 
 void setup(void) {
   pinMode(0,INPUT_PULLUP);
@@ -71,6 +94,7 @@ void setup(void) {
   delay(3000);
 
   configTime(gmtOffset_sec, daylightOffset_sec, ntpServer);
+  printLocalTime();
 
   // Screen setup
   tft.setTextColor(TFT_WHITE,TFT_BLACK);
@@ -119,6 +143,9 @@ int period = 2000;      // Period for data request
 int btnLeft = 0;        // Invert display colors
 int btnRight = 0;       // Brightness controll
 int frame = 0;          // Frame for animation
+String currentDate;
+String currentSec;
+String currentTime;
 bool inverted = 1;      // Display invert state
 
 void loop() {
@@ -179,33 +206,35 @@ void loop() {
   tft.setCursor(2, 227);
   tft.println(hum+"%");
 
-  // Get date and time
-  struct tm timeinfo;
-  if(!getLocalTime(&timeinfo)){
-    Serial.println("Failed to obtain time");
-    return;
-  }
-  
-  // Display date
-  tft.setTextColor(TFT_ORANGE,TFT_BLACK);
-  tft.setTextFont(2);
-  tft.setCursor(6, 44);
-  tft.println(&timeinfo, "%B %d %Y");
+  printLocalTime();
 
-  Serial.println(&timeinfo);
+  // Display date
+  if (currentDate != dateFormat) {
+    currentDate = dateFormat;
+    tft.setTextColor(TFT_ORANGE,TFT_BLACK);
+    tft.setTextFont(2);
+    tft.setCursor(6, 44);
+    tft.println(dateFormat);
+  }
 
   // Display seconds
-  tft.setTextColor(TFT_WHITE,TFT_BLACK);
-  tft.fillRect(78,170,48,28,TFT_DARKRED);
-  tft.setFreeFont(&Orbitron_Light_24);
-  tft.setCursor(81, 192);
-  tft.println(&timeinfo, "%S");
+  if (currentSec != secondFormat) {
+    currentSec = secondFormat;
+    tft.setTextColor(TFT_WHITE,TFT_BLACK);
+    tft.fillRect(78,170,48,28,TFT_DARKRED);
+    tft.setFreeFont(&Orbitron_Light_24);
+    tft.setCursor(81, 192);
+    tft.println(secondFormat);
+  }
 
   // Display time
-  tft.setFreeFont(&Orbitron_Light_32);
-  tft.fillRect(3,8,120,30,TFT_BLACK);
-  tft.setCursor(5, 34);
-  tft.println(&timeinfo, "%H %M");
+  if (currentTime != timeFormat) {
+    currentTime = timeFormat;
+    tft.setFreeFont(&Orbitron_Light_32);
+    tft.fillRect(3,8,120,30,TFT_BLACK);
+    tft.setCursor(5, 34);
+    tft.println(timeFormat);
+  }
   
   delay(80);
 }
