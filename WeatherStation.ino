@@ -1,12 +1,14 @@
-#include "ani.h"
 #include <SPI.h>
 #include <TFT_eSPI.h>
-#include <ArduinoJson.h>
-#include <time.h>
-#include "Orbitron_Medium_20.h"
 #include <WiFi.h>
+#include <time.h>
 #include <HTTPClient.h>
+#include <ArduinoJson.h>
+#include "Orbitron_Medium_20.h"
+#include "ani.h"
+#include "env.h"
 
+// Define colors for display
 #define TFT_GREY 0x5AEB
 #define TFT_LIGHTBLUE 0x01E9
 #define TFT_DARKRED 0xA041
@@ -30,15 +32,10 @@ char dateFormat[80];
 char secondFormat[80];
 char timeFormat[80];
 
-// Wifi
-const char* ssid = "ssid"; // EDIT
-const char* password = "password"; // EDIT
-
 // Open Weather API
 const String town = "Oslo";
 const String country = "NO";
 const String endpoint = "http://api.openweathermap.org/data/2.5/weather?q="+town+","+country+"&units=metric&APPID=";
-const String key = "apiKey"; // EDIT
 
 // Data
 String payload = "";  // whole json 
