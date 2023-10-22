@@ -2,7 +2,7 @@
 
 I got the original code for study, I organized it and many new features!
 
-![Weather Station by Junior Polegato](https://github.com/JuniorPolegato/TTGOWeatherStation/assets/TTGOWeatherStation.jpg)
+![Weather Station by Junior Polegato](https://raw.githubusercontent.com/JuniorPolegato/TTGOWeatherStation/main/assets/TTGOWeatherStation.jpg)
 [REPO](https://github.com/JuniorPolegato/TTGOWeatherStation)
 
 ## How to get it on
