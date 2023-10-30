@@ -98,6 +98,7 @@ const uint8_t Orbitron_Bold_14Bitmaps[] PROGMEM = {
 	0xFF,0xFF,0xFF, // '|'
 	0xD9,0x26,0xD2,0xD8, // '}'
 	0x7B,0xCE,0x0,0xFE,0xFF,0x3,0xFF,0xFF,0xC3,0xFF,0xFF, // 'ã'
+	0x3C,0xE7,0x00,0xFE,0xFF,0x03,0xFF,0xFF,0xC3,0xFF,0xFF, // 'â'
 };
 const GFXglyph Orbitron_Bold_14Glyphs[] PROGMEM = {
 // bitmapOffset, width, height, xAdvance, xOffset, yOffset
@@ -295,7 +296,7 @@ const GFXglyph Orbitron_Bold_14Glyphs[] PROGMEM = {
 	  {     0,   0,   0,   0,    0,   -0 }, // ''
 	  {     0,   0,   0,   0,    0,   -0 }, // ''
 	  {     0,   0,   0,   0,    0,   -0 }, // ''
-	  {     0,   0,   0,   0,    0,   -0 }, // ''
+	  {   888,   8,  11,  11,    1,  -11 }, // 'â' 0xE2
 	  {   877,   8,  11,  11,    1,  -11 }, // 'ã' 0xE3
 };
 const GFXfont Orbitron_Bold_14 PROGMEM = {

@@ -16,6 +16,8 @@
 #define PIN_BUTTON1 0
 #define PIN_BUTTON2 35
 
+#define USE_STRPTIME
+
 typedef struct {
 	const char* town;
 	const char* country;
@@ -29,7 +31,10 @@ const String key = "d0d0bf1bb7xxxx2e5dce67c95f4fd0800";
 // Select your towns
 const Towns towns[] PROGMEM = {
     {"Ribeirão Preto", "BR"},
+    {"Cândia", "BR"},
     {"São Paulo", "BR"},
+    {"Cafelândia", "BR"},
+    {"Monções", "BR"},
     {"Paris", "FR"},
     {"Madrid", "ES"},
     {"New York", "US"},
@@ -204,6 +209,7 @@ void loop() {
     tft.setCursor(2, 232, 1);
     if (++footer_pos == footer_end)
         footer_pos = footer;
+    footer_pos += *footer_pos > 127;
     footer_30 = *(footer_pos + 30);
     *(footer_pos + 30) = '\0';
     tft.println(footer_pos);
@@ -285,7 +291,6 @@ bool getData() {
             String _sunrise = doc["sys"]["sunrise"];
             String _sunset = doc["sys"]["sunset"];
             String _timezone = doc["timezone"];
-            String _name = doc["name"];
 
             curTimezone = atoi(_timezone.c_str());
             setRtcTime(http.header("Date"));
@@ -320,7 +325,7 @@ bool getData() {
             char buffer[6];
             time_t _time;
 
-            _name = "   " + _name;
+            String _name = String("   ") + towns[curTown].town;
 
             _time = atoi(_dt_capture.c_str()) + curTimezone;
             strftime(buffer, 6, "%H:%M", gmtime(&_time));
@@ -369,6 +374,7 @@ bool getData() {
     return true;
 }
 
+#ifndef USE_STRPTIME
 int numberOfMonth(const char* month) {
     String m3 = String((char) tolower(*month)) + (char) tolower(month[1]) + (char) tolower(month[2]);
     if (m3 == "jan") return 1;
@@ -385,8 +391,14 @@ int numberOfMonth(const char* month) {
     if (m3 == "dec") return 12;
     return 0;
 }
+#endif // !USE_STRPTIME
 
 void setRtcTime(String date_string){
+#ifdef USE_STRPTIME
+    struct tm t;
+    strptime(date_string.c_str(), "%a, %d %b %Y %H:%M:%S GMT", &t);
+    rtc.setTime(mktime(&t) + curTimezone);
+#else
     int day, month, year, hours, minutes, seconds;
     const char* c = date_string.c_str();
     while (*c++ != ' '); c--; while (*c++ == ' '); c--; day = atoi(c);
@@ -397,6 +409,7 @@ void setRtcTime(String date_string){
     while (*c++ != ':'); seconds = atoi(c);
     rtc.setTime(seconds, minutes, hours, day, month, year);
     rtc.setTime(rtc.getEpoch() + curTimezone);
+#endif // USE_STRPTIME
 }
 
 bool getLocalInfo() {

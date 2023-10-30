@@ -12,11 +12,11 @@ I got the original code for study, I organized it and many new features!
 
 2. Open with Arduino IDE or VSCodium (ou VSCode) with extensions vscode-arduino extension and vscode-cpptools.
 
-3. Install libraries TFT_eSPI from the interface tools.
+3. Install library TFT_eSPI from the interface tools. For footer font fix, use this fork [REPO](https://github.com/JuniorPolegato/TFT_eSPI/)
 
 4. Configure TFT_eSPI editing file User_Setup_Select.h, where you need comment “#include <User_Setup.h>” and uncomment line for your device, just one line, for my case “#include <User_Setups/Setup25_TTGO_T_Display.h>” line.
 
-5. Clone or download ArduinoJson from [REPO](https://github.com/bblanchon/ArduinoJson.git) into your Arduino/libraries directory.
+5. Install library ArduinoJson from interface tools.
 
 6. Get your free API Key from https://openweathermap.org/.
 
