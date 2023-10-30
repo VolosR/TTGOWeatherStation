@@ -207,9 +207,9 @@ void loop() {
     }
 
     tft.setCursor(2, 232, 1);
+    footer_pos += *footer_pos > 127;
     if (++footer_pos == footer_end)
         footer_pos = footer;
-    footer_pos += *footer_pos > 127;
     footer_30 = *(footer_pos + 30);
     *(footer_pos + 30) = '\0';
     tft.println(footer_pos);
