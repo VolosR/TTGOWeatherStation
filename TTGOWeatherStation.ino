@@ -1,9 +1,11 @@
 #include <TFT_eSPI.h>        // Hardware-specific: user must select board in library
-#include <ArduinoJson.h>     // https://github.com/bblanchon/ArduinoJson.git
 #include <ESP32Time.h>       // replace #include <NTPClient.h>  // https://github.com/taranais/NTPClient
-#include <WiFi.h>
 #include <HTTPClient.h>
+#include <ArduinoJson.h>     // https://github.com/bblanchon/ArduinoJson.git
+#include <ESPAsyncWebServer.h>  // https://github.com/JuniorPolegato/ESPAsyncWebServer
 
+#include "ESPUserConnection.h"
+#include "fs_operations.h"
 #include "animation.h"
 #include "icons.h"
 #include "Orbitron_Bold_14.h"
@@ -19,41 +21,15 @@
 #define USE_STRPTIME
 
 typedef struct {
-	const char* town;
-	const char* country;
-} Towns;
+    String city;
+    String country;
+} Cities;
 
-// User data - EDIT
-const char* ssid = "IGKx20";
-const char* password = "1804672019";
-const String key = "d0d0bf1bb7xxxx2e5dce67c95f4fd0800";
-
-// Select your towns
-const Towns towns[] PROGMEM = {
-    {"Ribeirão Preto", "BR"},
-    {"Cândia", "BR"},
-    {"São Paulo", "BR"},
-    {"Cafelândia", "BR"},
-    {"Monções", "BR"},
-    {"Paris", "FR"},
-    {"Madrid", "ES"},
-    {"New York", "US"},
-    {"Brasília", "BR"},
-    {"Cuiabá", "BR"},
-    {"Manaus", "BR"},
-    {"Camaçari", "BR"},
-    {"Tokyo", "JP"},
-    {"Miami", "US"},
-    {"Malibu", "US"},
-    {"Anchorage", "US"},
-    {"Vancouver", "CA"},
-    {"Ottawa", "CA"},
-    {"Zürich", "CH"},
-    {"London", "GB"},
-    {"Greenland", "GL"},
-};
+Cities *cities = NULL;
+size_t qtd_cities = 0;
 
 // Initialization
+
 TFT_eSPI tft = TFT_eSPI();
 TFT_eSprite spr = TFT_eSprite(&tft);
 ESP32Time rtc(0);  // GMT by default
@@ -62,7 +38,8 @@ const int pwmFreq = 5000;
 const int pwmResolution = 8;
 const int pwmLedChannelTFT = 0;
 const int backlight[5] = {10, 30, 60, 120, 220};
-const String endpoint = "http://api.openweathermap.org/data/2.5/weather?units=metric&APPID=" + key + "&q=";
+
+String endpoint;
 
 // Variables for loop operation
 String curDate = "";
@@ -72,7 +49,7 @@ String curTemperature = "";
 String curHumidity = "";
 byte curBright = 1;
 int curTimezone = 0;
-int curTown = 0;
+int curCity = 0;
 int loopCount = 0;
 int press1 = 0;
 int press2 = 0;
@@ -84,6 +61,135 @@ char* footer;
 char* footer_pos;
 char* footer_end;
 char  footer_30;
+bool ap_mode = false;
+
+void load_cities() {
+    int i, d;
+
+    String file_data = readFile("/cities.txt");
+    if (file_data.length() < 6)
+        file_data = "Ribeirão Preto\tBR\n";
+    else if (!file_data.endsWith("\n"))
+        file_data += '\n';
+
+    qtd_cities = 0;
+    i = 0;
+    while ((i = file_data.indexOf('\n', ++i)) != -1)
+        qtd_cities++;
+
+    if (cities)
+        free(cities);
+    cities = (Cities*)calloc(qtd_cities, sizeof(Cities));
+
+    Cities *c = cities;
+    i = 0;
+    for (;;) {
+        d = file_data.indexOf('\t', i);
+        if (d == -1) break;
+        c->city = file_data.substring(i, d++);
+        i = file_data.indexOf('\n', d);
+        if (i == -1) break;
+        c->country = file_data.substring(i++, d);
+        Serial.println(c->city + " - " + c->country);
+        c++;
+    }
+    curCity = 0;
+}
+
+void update_city() {
+    tft.fillRect(0, 60, 135, 27, TFT_BLACK);
+    tft.setCursor(6, 82);
+    tft.setFreeFont(&Orbitron_Medium_20);
+    if (tft.textWidth(cities[curCity].city) > tft.width() - 12)
+        tft.setFreeFont(&Orbitron_Bold_14);
+    tft.println(cities[curCity].city);
+    loopCount = 3000;  // force to getData for current city
+}
+
+// Customizations from ESPUserConnection.cpp
+extern AsyncWebServer webserver;
+
+extern void user_request_data(AsyncWebServerRequest *request, bool restart=true);
+
+void custom_user_request_data(AsyncWebServerRequest *request) {
+    int params = request->params();
+
+    if (params >= 3) {
+        String key = request->getParam(2)->value();
+
+        if (key.length() == 32)
+            writeFile("/key.txt", key, true);
+
+        else if (key == "delete")
+            deleteFile("/key.txt");
+
+        user_request_data(request);
+    }
+    else
+        request->send(500);
+}
+
+void append_to_webserver() {
+    webserver.on("/list_cities", HTTP_GET, [](AsyncWebServerRequest *request) {
+        int i = 0, d;
+        String city, country;
+
+        String file_data = readFile("/cities.txt");
+
+        String resp = "[{\"city\":\"Click here to add\",\"country\":\"BR\"}";
+        for (;;) {
+            d = file_data.indexOf('\t', i);
+            if (d == -1) break;
+            city = file_data.substring(i, d++);
+            i = file_data.indexOf('\n', d);
+            if (i == -1) break;
+            country = file_data.substring(d, i++);
+            resp += ",{\"city\":\"" + city + "\","
+                    "\"country\":\"" + country + "\"}";
+        }
+
+        request->send(200, "application/json", resp + ']');
+    });
+
+    webserver.on("/config_cities", HTTP_POST, [](AsyncWebServerRequest *request) {
+        int params = request->params();
+
+        if (params == 3) {
+            String city = request->getParam(0)->value();
+            String country = request->getParam(1)->value();
+            String operation = request->getParam(2)->value();
+            int i = -1, n;
+
+            if (operation != "add" && operation != "delete") {
+                request->send(500);
+                return;
+            }
+
+            String file_data = readFile("/cities.txt");
+            renameFile("/cities.txt", "/cities.txt.bak");
+
+            String line = city + '\t' + country + '\n';
+            i = file_data.indexOf(line);
+            if (i > -1)  // delete the line
+                file_data = file_data.substring(0, i) + file_data.substring(i + line.length());
+
+            if (operation == "add")
+                file_data = line + file_data;
+
+            if (writeFile("/cities.txt", file_data, true))
+                deleteFile("/cities.txt.bak");
+            else
+                renameFile("/cities.txt.bak", "/cities.txt");
+
+            request->send(200, "text/html", go_back_html);
+
+            load_cities();
+            update_city();
+        }
+        else
+            request->send(500);
+    });
+}
 
 void setup(void) {
     Serial.begin(115200);
@@ -94,6 +200,7 @@ void setup(void) {
     tft.setRotation(0);
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextFont(1);
     tft.setTextSize(1);
 
     spr.setColorDepth(16);
@@ -106,19 +213,16 @@ void setup(void) {
 
     // Wi-Fi connection
 
-    tft.println(String("* ") + ssid + " *\n");
-    tft.print("Connecting");
-    WiFi.begin(ssid, password);
-
-    while (WiFi.status() != WL_CONNECTED) {
-      delay(500);
-      tft.print(".");
+#ifdef OUTPUT_IS_TFT
+    if (!connect_wifi(&tft, ap_mode)){
+#else
+    if (!connect_wifi(ap_mode)){
+#endif  // OUTPUT_IS_TFT
+        ap_mode = true;
+        return;
     }
 
-    tft.println("\n\nWiFi connected!");
-    tft.println("\nIP address:");
-    tft.println(WiFi.localIP());
-    delay(3000);
+    append_to_webserver();
 
     // Layout
 
@@ -150,18 +254,87 @@ void setup(void) {
 
     tft.setCursor(6, 82);
     tft.setFreeFont(&Orbitron_Medium_20);
-    if (tft.textWidth(towns[curTown].town) > tft.width() - 12)
+
+    load_cities();
+    if (tft.textWidth(cities[curCity].city) > tft.width() - 12)
         tft.setFreeFont(&Orbitron_Bold_14);
-    tft.println(towns[curTown].town);
+    tft.println(cities[curCity].city);
 
     for(int i = 0; i <= curBright; i++)
         tft.fillRect(93 + (i * 7), 216, 3, 10, TFT_BLUE);
 
-    getLocalInfo();
-    getData();
+    String key = readFile("/key.txt").substring(0, 32);
+    // Serial.println("[" + key + "]");
+    endpoint = "http://api.openweathermap.org/data/2.5/weather?units=metric&APPID=" + key + "&q=";
+
+    String api_error;
+    for (;;) {
+        api_error.clear();
+
+        if (!getLocalInfo())
+            api_error = "IP Info";
+
+        if (!getData())
+            if (api_error.length())
+                api_error += "\nOpen Weather";
+            else
+                api_error = "Open Weather";
+
+        if (!api_error.length()) break;
+
+        key.clear();
+        tft.fillRect(0, 0, tft.getViewportWidth(), tft.getViewportHeight(), TFT_DARKRED);
+        tft.setFreeFont(&Orbitron_Bold_14);
+        tft.setTextColor(TFT_WHITE);
+        tft.setCursor(0, 20);
+        api_error = "Error!\n\n"
+                    + api_error + "\n\n"
+                    "Please, check:\n"
+                    "- internet\n"
+                    "- cities\n"
+                    "- countries\n"
+                    "- OpenWeather\n"
+                    "                    key\n\n\n";
+        tft.println(api_error);
+        tft.println(WiFi.localIP());
+        Serial.println(api_error);
+        Serial.println(WiFi.localIP());
+        tft.print("10 s"); tft.flush();
+        Serial.print("10 s"); Serial.flush();
+        for (int i=0; i < 10; i++) {
+            tft.print('.'); tft.flush();
+            Serial.print('.'); Serial.flush();
+            delay(1000);
+        }
+    }
+    if (!key.length())
+        setup();
 }
 
 void loop() {
+    if (ap_mode) {
+        if (WiFi.softAPgetStationNum() == 0) {
+
+#ifdef OUTPUT_IS_TFT
+            tft.print('.'); tft.flush();
+#else
+            Serial.print('.'); Serial.flush();
+#endif  // OUTPUT_IS_TFT
+
+            delay(1000);
+            return;
+        }
+
+#ifdef OUTPUT_IS_TFT
+        tft.println("\nConnected!\n");
+#else
+        Serial.println("\nConnected!\n");
+#endif  // OUTPUT_IS_TFT
+
+        vTaskDelete(NULL);  // Stop loop task, run just WebServer in AP mode
+        return;
+    }
+
     tft.pushImage(0, 88,  135, 65, animation[frame++]);
     if (frame == frames) frame = 0;
 
@@ -186,15 +359,9 @@ void loop() {
     if (digitalRead(PIN_BUTTON1) == 0) {
         if (press1 == 0) {
             press1 = 1;
-            if (++curTown == sizeof(towns) / sizeof(Towns))
-                curTown = 0;
-            tft.fillRect(0, 60, 135, 27, TFT_BLACK);
-            tft.setCursor(6, 82);
-            tft.setFreeFont(&Orbitron_Medium_20);
-            if (tft.textWidth(towns[curTown].town) > tft.width() - 12)
-                tft.setFreeFont(&Orbitron_Bold_14);
-            tft.println(towns[curTown].town);
-            loopCount = 3000;
+            if (++curCity == qtd_cities)
+                curCity = 0;
+            update_city();
         }
     }
     else
@@ -202,7 +369,7 @@ void loop() {
 
     if (++loopCount > 3000) {  /// about 5 minutes
         while (!getData())
-            delay(100);
+            delay(1000);
         loopCount = 0;
     }
 
@@ -262,7 +429,9 @@ bool getData() {
         HTTPClient http;
         int httpCode;
 
-        http.begin(endpoint + towns[curTown].town + "," + towns[curTown].country);
+        String _endpoint = endpoint + cities[curCity].city + "," + cities[curCity].country;
+        // Serial.println("[" + _endpoint + "]");
+        http.begin(_endpoint);
         const char *headerKeys[] = {"Date"};
         const size_t headerKeysCount = sizeof(headerKeys) / sizeof(headerKeys[0]);
         http.collectHeaders(headerKeys, headerKeysCount);
@@ -325,7 +494,7 @@ bool getData() {
             char buffer[6];
             time_t _time;
 
-            String _name = String("   ") + towns[curTown].town;
+            String _name = String("   ") + cities[curCity].city;
 
             _time = atoi(_dt_capture.c_str()) + curTimezone;
             strftime(buffer, 6, "%H:%M", gmtime(&_time));
@@ -354,7 +523,7 @@ bool getData() {
 
         }
         else {
-            Serial.println("Error on HTTP request [" + String(httpCode) + "]");
+            Serial.println("Error on\nHTTP OpenWeather\nrequest [" + String(httpCode) + "]");
             return false;
         }
 
@@ -365,12 +534,13 @@ bool getData() {
         return false;
     }
 
-    Serial.println("_____________________________________________________________");
-    Serial.println("Town: [" + String(curTown) + "] " + towns[curTown].town + ", " + towns[curTown].country);
+    Serial.println("_____________________________________________________________\n");
+    Serial.println("City: [" + String(curCity) + "] " + cities[curCity].city + ", " + cities[curCity].country);
     Serial.println("Date and time: " + rtc.getDateTime());
     Serial.println("Temperature: " + curTemperature);
     Serial.println("Humidity: " + curHumidity);
     Serial.println("Icon: " + icon);
+    Serial.println("_____________________________________________________________\n");
     return true;
 }
 

@@ -20,13 +20,21 @@ I got the original code for study, I organized it and many new features!
 
 6. Get your free API Key from https://openweathermap.org/.
 
-7. Put your Wi-Fi name and password, plus your key that you got above:
+~7. Put your Wi-Fi name and password, plus your key that you got above:~
+~|Name|Description|~
+~|----|-----------|~
+~|ssid|Name of the WiFi network|~
+~|password|WiFi password|~
+~|key|Open Weather API key|~
 
-|Name|Description|
-|----|-----------|
-|ssid|Name of the WiFi network|
-|password|WiFi password|
-|key|Open Weather API key|
+
+7. Now you can select many WiFi networks via web browser, and the cities too. I integrated the project [ESPUserConnection](https://github.com/JuniorPolegato/ESPUserConnection) of my own into this project. At first boot, you need to connect to ESP AP, access via web browser http://<esp_ap_ip>/wifi, upload files requested, them you can select your WiFi, enter password and your personal Open Weather key, reboot, then access http://<esp_wlan_ip> to manager cities, see bellow:
+
+![wifi_list.png](https://raw.githubusercontent.com/JuniorPolegato/TTGOWeatherStation/main/assets/wifi_list.png)
+![cities_list.png](https://raw.githubusercontent.com/JuniorPolegato/TTGOWeatherStation/main/assets/cities_list.png)
+![delete_box.png](https://raw.githubusercontent.com/JuniorPolegato/TTGOWeatherStation/main/assets/delete_box.png)
+![click_here_to_add.png](https://raw.githubusercontent.com/JuniorPolegato/TTGOWeatherStation/main/assets/click_here_to_add.png)
+![add_box.png](https://raw.githubusercontent.com/JuniorPolegato/TTGOWeatherStation/main/assets/add_box.png)
 
 ## Nice features
 
@@ -37,8 +45,10 @@ I got the original code for study, I organized it and many new features!
 - Temperature and Humidity with nice font and big size
 - Brightness level control by button 2 (right)
 - Wi-Fi IP address, internet IP address, local informations and extra town informations
-- Font editor, see [REPO](https://github.com/JuniorPolegato/Adafruit-GFX-font-editor)
-- Image converter, see [REPO](https://github.com/JuniorPolegato/image-to-rgb565)
+- Font editor, see [Adafruit-GFX-font-editor](https://github.com/JuniorPolegato/Adafruit-GFX-font-editor)
+- Image converter, see [image-to-rgb565](https://github.com/JuniorPolegato/image-to-rgb565)
+- Connect your WiFi via web browser, see [ESPUserConnection](https://github.com/JuniorPolegato/ESPUserConnection)
+- Manager Citeis via web browser, a extension easy to implement from [ESPUserConnection](https://github.com/JuniorPolegato/ESPUserConnection)
 
 ## Work description
 
@@ -65,13 +75,17 @@ I got the original code for study, I organized it and many new features!
 
 - Aboud IDE, it used VSCodium (VSCode without telemetry/tracking), with vscode-arduino extension, plus vscode-cpptools.
 
+- Now I added WiFi and Cities management via web browser using [ESPUserConnection](https://github.com/JuniorPolegato/ESPUserConnection)
+
 ### Credits
 
-Here is the original [REPO](https://github.com/VolosR/TTGOWeatherStation).
+Here is the original: [TTGOWeatherStation](https://github.com/VolosR/TTGOWeatherStation) of VolosR.
 
-Here is the font editor [REPO](https://github.com/JuniorPolegato/Adafruit-GFX-font-editor).
+Here is the font editor: [Adafruit-GFX-font-editor](https://github.com/JuniorPolegato/Adafruit-GFX-font-editor) of my own.
 
-Here is the image converter [REPO](https://github.com/JuniorPolegato/image-to-rgb565).
+Here is the image converter: [image-to-rgb565](https://github.com/JuniorPolegato/image-to-rgb565) of my own.
+
+Here is the web browser integration: [ESPUserConnection](https://github.com/JuniorPolegato/ESPUserConnection) of my own.
 
 ### License
 

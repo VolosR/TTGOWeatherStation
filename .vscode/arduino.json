@@ -2,5 +2,6 @@
     "board": "esp32:esp32:ttgo-lora32",
     "port": "/dev/ttyUSB0",
     "output": "../build/TTGOWeatherStation",
-    "sketch": "TTGOWeatherStation.ino"
+    "sketch": "TTGOWeatherStation.ino",
+    "configuration": "Revision=TTGO_LoRa32_V1,FlashFreq=80,UploadSpeed=921600,DebugLevel=none,EraseFlash=none"
 }

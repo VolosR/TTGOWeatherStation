@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en-us">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TTGO Weather Station - by Junior Polegato</title>
+
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            outline: none!important;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+            /* font-weight: 700; */
+            -webkit-tap-highlight-color: rgba(255,255,255,0);
+            -webkit-touch-callout: none;
+        }
+
+        body, html {
+            min-height: 100vh;
+            display: block;
+        }
+
+	h1 {
+	    text-align: center;
+        }
+
+
+        .noscroll {
+            height: 100%;
+            overflow: hidden;
+        }
+
+
+        .container {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .wf_row {
+            padding: 10px;
+            box-shadow: 0px 1px 6px rgba(0,0,0,0.35);
+            margin-top: 30px;
+            border-radius: 5px;
+            min-width: 500px;
+            width: max-content;
+            border-collapse: collapse;
+            overflow: hidden;
+        }
+
+        .wf_row th, .wf_row td {
+            padding: 10px;
+            text-align: center;
+        }
+
+        .wf_row th {
+            color: yellow;
+            background: darkgreen;
+        }
+
+        .wf_row tbody tr:hover {
+            background-color: #d4d6d8;
+            cursor: pointer;
+        }
+
+        .wf_row tr:nth-child(2n) {
+            background-color: #E7E9EB;
+        }
+
+        .wf_row tr {
+            border-bottom: 1px solid #ddd;
+        }
+
+        .config_pp {
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            gap: 15px;
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            margin: auto;
+            background: white;
+            border-radius: 10px;
+            padding: 10px;
+            width: max-content;
+            height: max-content;
+        }
+
+        .overlay {
+            background-color: rgba(54, 54, 54, 0.7);
+            position: absolute;
+            width: 100%;
+            height: 100%;
+        }
+
+        .ssid {
+            font-weight: bold;
+            font-size: 1.5rem;
+            padding: 10px;
+        }
+
+        .ent {
+            background-color: #F2F4F6;
+            border: 3px solid #F2F4F6;
+            border-radius: 5px;
+            height: max-content;
+            padding: 2px 7px;
+            width: 25rem;
+            display: flex;
+            align-items: center;
+        }
+
+        .ent.error {
+            border-color: red;
+        }
+
+        .ent > input {
+            border: none;
+            width: 100%;
+            background: transparent;
+            padding: 5px;
+            font-size: 1.2rem;
+        }
+
+        .subbtn {
+            background-color: #0069d9;
+            border: none;
+            color: white;
+            font-size: 1.3rem;
+            padding: 10px;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        .subbtn:hover {
+            background-color: #0657ad;
+        }
+
+        @media screen and (max-width: 550px) {
+            .wf_row {
+                min-width: unset;
+                width: 96%;
+            }
+        }
+    </style>
+
+</head>
+<body>
+    <h1>TTGO Weather Station - by Junior Polegato</h1>
+    <div class="overlay" style="display: none;"></div>
+    <div class="config_pp" style="display: none;">
+        <div class="ssid">
+            <p></p>
+        </div>
+        <div class="ent">
+            <input type="text" name="ssid" id="_ssid" placeholder="WiFi network">
+        </div>
+        <div class="ent">
+            <input type="password" name="passwd" id="_passwd" placeholder="password (or type delete or open)">
+        </div>
+
+        <div class="ent">
+            <input type="password" name="key" id="_key" placeholder="OpenWeather key (or type delete)">
+        </div>
+        <div class="subbtn">
+            <p>Restart Weather Station</p>
+        </div>
+    </div>
+    <div class="container">
+        <table class="wf_row">
+            <thead>
+                <tr>
+                    <th scope="col">
+                        <p>Name</p>
+                    </th>
+                    <th scope="col">
+                        <p>Quality</p>
+                    </th>
+                    <th scope="col">
+                        <p>Security</p>
+                    </th>
+                </tr>
+            </thead>
+            <tbody>
+            </tbody>
+        </table>
+    </div>
+    <script>
+        var elementFactory = function (content) {
+            var dummy = document.createElement('div');
+
+            dummy.innerHTML = content;
+            dummy.removeChild(dummy.firstChild);
+            return dummy.firstChild;
+
+        };
+
+        function insertAfter(ref, node) {
+            ref.parentNode.insertBefore(node, ref.nextSibling);
+        }
+
+        function toggleEl(el) {
+            if (el.hasAttribute("style")) {
+                el.removeAttribute("style");
+            }
+
+            else {
+                el.setAttribute("style", "display: none");
+            }
+
+        }
+
+        function configPP(ssid) {
+            let overlay = document.querySelector(".overlay");
+            let pp = document.querySelector(".config_pp");
+            let rname = pp.querySelector(".ssid");
+
+            rname.innerHTML = ssid;
+            document.querySelector(".ent").children[0].value = ssid;
+
+            toggleEl(overlay);
+            toggleEl(pp);
+            document.body.classList.toggle("noscroll");
+        }
+
+        function sendContent(url, content) {
+            let xhr = new XMLHttpRequest();
+            let data = "";
+
+            for (const [key, value] of Object.entries(content)) {
+                if (data.length)
+                    data += "&";
+                data += `${key}=${value}`;
+            }
+
+            console.log(url, content, data);
+            xhr.open("POST", url, true);
+
+            xhr.setRequestHeader("Content-Type", "application/x-www-form-urlencoded");
+            xhr.send(data);
+
+            alert("The Weather Station is now restarting...\n\You can close this window or OK to reload if failed.");
+            location.reload();
+        }
+
+        function getContent(url) {
+            let xhr = new XMLHttpRequest();
+            let list = "";
+            let security=4;
+            let security_code="WPA/WPA2";
+            let tbody = document.querySelector("tbody");
+
+            console.log(`Get from ${url}`);
+            tbody.innerHTML = "";
+            xhr.open('GET', url, true);
+
+            xhr.onload = function (e) {
+                if (xhr.readyState === 4) {
+                    if (xhr.status === 200) {
+                        if (xhr.responseText == "[]" || xhr.responseText == undefined) {
+                            return;
+                        }
+
+                        // Realizar todo procedimento aqui
+                        let json = xhr.responseText;
+                        json = JSON.parse(json);
+
+                        if (json[0].name == "Trying again...") {
+                            list = `<tr><td>${json[0].name}</td><td>${json[0].quality}</td><td>${json[0].security}</td></tr>`;
+                            tbody.innerHTML = list;
+                            setTimeout(getContent("/scan"), 3000);
+                            return;
+                        }
+
+                        for (var i = 0; i < json.length; i++) {
+                            security = json[i].security;
+
+                            switch (security) {
+                                case 0:
+                                    security_code = "Open";
+                                    break;
+                                case 1:
+                                    security_code = "WEP";
+                                    break;
+                                case 2:
+                                    security_code = "WPA/PSK";
+                                    break;
+                                case 3:
+                                    security_code = "WPA2/PSK";
+                                    break;
+                                case 4:
+                                    security_code = "WPA/WPA2";
+                                    break;
+                                case 5:
+                                    security_code = "WPA2-Enterprise";
+                                    break;
+                                case 6:
+                                    security_code = "AuthMax";
+                                    break;
+                            }
+
+                            list += `<tr><td>${json[i].name}</td><td>${100 - (json[i].quality * -1)}%</td><td>${security_code}</td></tr>`;
+                        }
+
+                    }
+                }
+
+                tbody.innerHTML = list;
+
+                let trs = document.querySelectorAll("tbody > tr");
+                let sub_btn = document.querySelector(".subbtn")
+                console.log(trs);
+
+                trs.forEach(function(key) {
+                    key.addEventListener("click", () => {
+                        configPP(key.children[0].innerHTML.trim().replaceAll("\n", ""));
+                    });
+                });
+
+                sub_btn.addEventListener("click", function(key) {
+                    let content = {
+                        ssid: this.parentNode.children[1].children[0].value,
+                        passwd: this.parentNode.children[2].children[0].value,
+                        key: this.parentNode.children[3].children[0].value,
+                    }
+
+                    let ents = document.querySelectorAll(".ent");
+                    let error = false;
+
+                    if (content.ssid.length = 0) {
+                        ents[0].classList.toggle("error");
+                        setTimeout(() => {ents[0].classList.toggle("error")}, 1000);
+                        error = true;
+                    }
+
+                    if (content.passwd.length > 0 && content.passwd.length < 8 && content.passwd != "open" && content.passwd != "delete") {
+                        ents[1].classList.toggle("error");
+                        setTimeout(() => {ents[1].classList.toggle("error")}, 1000);
+                        error = true;
+                    }
+
+                    if (content.key.length > 0 && content.key.length != 32 && content.key != "delete") {
+                        ents[2].classList.toggle("error");
+                        setTimeout(() => {ents[2].classList.toggle("error")}, 1000);
+                        error = true;
+                    }
+
+                    if (!error)
+                        sendContent("/wifi", content);
+                })
+            };
+
+            xhr.onerror = function (e) { // se houver qualquer erro na requisição, também é mostrado em uma mensagem de erro
+                console.log("error");
+                console.log(e);
+            };
+
+            xhr.send(null);
+        }
+
+        window.onload = () => {
+            document.querySelector(".overlay").addEventListener("click", () =>  {
+                configPP();
+            });
+
+            setInterval(getContent("/scan"), 10000);
+        }
+
+    </script>
+</body>
+</html>
