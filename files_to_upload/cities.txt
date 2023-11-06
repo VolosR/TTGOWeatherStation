@@ -1,0 +1,21 @@
+Ribeirão Preto	BR
+Cândia	BR
+São Paulo	BR
+Cafelândia	BR
+Monções	BR
+Paris	FR
+Madrid	ES
+New York	US
+Brasília	BR
+Cuiabá	BR
+Manaus	BR
+Camaçari	BR
+Tokyo	JP
+Miami	US
+Malibu	US
+Anchorage	US
+Vancouver	CA
+Ottawa	CA
+Zürich	CH
+London	GB
+Greenland	GL

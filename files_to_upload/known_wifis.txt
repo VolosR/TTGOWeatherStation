@@ -1,0 +1,3 @@
+WiFi One	@12345678
+WiFi 2	test@local
+Home	nopasswd
